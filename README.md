@@ -2,7 +2,12 @@
 
 Personal Pi setup for organizing and maintaining my own Pi environment.
 
-This repository currently pins the setup files used by this Pi environment:
+This repository contains two pieces:
+
+- a Pi package that provides the Pithagoras interaction stance extension
+- repo-managed snapshots of my personal Pi setup
+
+The setup snapshots are:
 
 - Pi user defaults in `configs/pi/AGENTS.md`
 - Pi system prompt append in `configs/pi/APPEND_SYSTEM.md`
@@ -11,6 +16,41 @@ This repository currently pins the setup files used by this Pi environment:
 - `agent-browser` defaults in `configs/agent-browser/config.json`
 
 `pi/` is a Git submodule pointing to [`earendil-works/pi`](https://github.com/earendil-works/pi). It is kept here as an implementation and documentation reference.
+
+## Pi package
+
+Install from GitHub:
+
+```bash
+pi install git:github.com/NihilDigit/pithagoras
+```
+
+Pin a specific ref when needed:
+
+```bash
+pi install git:github.com/NihilDigit/pithagoras@<tag-or-commit>
+```
+
+Try it for one run without installing:
+
+```bash
+pi -e git:github.com/NihilDigit/pithagoras
+```
+
+Local development:
+
+```bash
+pi -e .
+```
+
+Commands provided by the package:
+
+- `/frame` — enter Framing stance
+- `/probe` — enter Probe stance
+- `/groundup` — enter GroundUp stance
+- `/pithagoras off` — clear the current stance
+
+After installing or updating the package, restart Pi or run `/reload`.
 
 ## Current setup
 
