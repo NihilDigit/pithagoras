@@ -5,6 +5,7 @@ Personal Pi setup for organizing and maintaining my own Pi environment.
 This repository currently pins three pieces of setup:
 
 - Pi user defaults in `configs/pi/AGENTS.md`
+- Pi system prompt append in `configs/pi/APPEND_SYSTEM.md`
 - Pi package expectations in `configs/pi/settings.json`
 - `pi-web-access` defaults in `configs/pi/web-search.json`
 - `agent-browser` defaults in `configs/agent-browser/config.json`

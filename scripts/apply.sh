@@ -16,6 +16,7 @@ backup_copy() {
 }
 
 backup_copy "$ROOT/configs/pi/AGENTS.md" "$HOME/.pi/agent/AGENTS.md"
+backup_copy "$ROOT/configs/pi/APPEND_SYSTEM.md" "$HOME/.pi/agent/APPEND_SYSTEM.md"
 backup_copy "$ROOT/configs/pi/web-search.json" "$HOME/.pi/web-search.json"
 backup_copy "$ROOT/configs/agent-browser/config.json" "$HOME/.agent-browser/config.json"
 
