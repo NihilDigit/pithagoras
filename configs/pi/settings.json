@@ -1,0 +1,6 @@
+{
+  "packages": [
+    "npm:pi-resource-center",
+    "npm:pi-web-access"
+  ]
+}
