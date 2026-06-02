@@ -23,6 +23,7 @@ backup_copy "$ROOT/configs/agent-browser/config.json" "$HOME/.agent-browser/conf
 # Install/update the Pi packages this setup expects. `pi install` is idempotent for already-installed packages.
 pi install npm:pi-resource-center || true
 pi install npm:pi-web-access || true
+pi install npm:@aliou/pi-guardrails || true
 
 # Install agent-browser and its Agent Skill. The skill is a stable stub that loads version-matched usage docs from the CLI.
 bun install -g agent-browser || true

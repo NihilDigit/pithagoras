@@ -2,7 +2,7 @@
 
 Personal Pi setup for organizing and maintaining my own Pi environment.
 
-This repository currently pins three pieces of setup:
+This repository currently pins the setup files used by this Pi environment:
 
 - Pi user defaults in `configs/pi/AGENTS.md`
 - Pi system prompt append in `configs/pi/APPEND_SYSTEM.md`
@@ -18,6 +18,7 @@ Pi packages:
 
 - `npm:pi-resource-center`
 - `npm:pi-web-access`
+- `npm:@aliou/pi-guardrails`
 
 Browser automation:
 
