@@ -22,6 +22,10 @@ backup_copy "$ROOT/configs/agent-browser/config.json" "$HOME/.agent-browser/conf
 pi install npm:pi-resource-center || true
 pi install npm:pi-web-access || true
 
+# Install agent-browser and its Agent Skill. The skill is a stable stub that loads version-matched usage docs from the CLI.
+bun install -g agent-browser || true
+bunx skills add vercel-labs/agent-browser -g --skill agent-browser --agent '*' -y || true
+
 ROOT="$ROOT" python - <<'PY'
 import json
 import os

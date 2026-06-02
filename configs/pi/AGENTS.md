@@ -62,7 +62,7 @@ For local browser automation, prefer `agent-browser` with the user's real Chrome
 }
 ```
 
-Invoke it with `bunx agent-browser ...` unless a project installs or pins another entry point. This should reuse the user's logged-in Chrome state and show the browser window.
+Invoke it with `agent-browser ...`; use `bunx agent-browser ...` as a fallback if the global binary is unavailable. This should reuse the user's logged-in Chrome state and show the browser window.
 
 Keep browser actions read-only by default. Ask before submitting forms, changing settings, sending messages, deleting data, purchasing, or touching account-sensitive state.
 

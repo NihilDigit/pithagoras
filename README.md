@@ -19,7 +19,8 @@ Pi packages:
 
 Browser automation:
 
-- `agent-browser`
+- `agent-browser` global CLI
+- `agent-browser` Agent Skill from `vercel-labs/agent-browser`
 - headed mode
 - Chrome `Default` profile for logged-in state
 
@@ -33,7 +34,7 @@ Documentation fallback:
 ./scripts/apply.sh
 ```
 
-The script backs up existing target files before copying configs, installs the expected Pi packages, and merges the package list into `~/.pi/agent/settings.json`.
+The script backs up existing target files before copying configs, installs the expected Pi packages, installs `agent-browser`, installs the `agent-browser` Agent Skill via `bunx skills`, and merges the package list into `~/.pi/agent/settings.json`.
 
 After applying, restart Pi or run `/reload` where applicable.
 
