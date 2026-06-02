@@ -6,6 +6,7 @@ This repository currently pins three pieces of setup:
 
 - Pi user defaults in `configs/pi/AGENTS.md`
 - Pi package expectations in `configs/pi/settings.json`
+- `pi-web-access` defaults in `configs/pi/web-search.json`
 - `agent-browser` defaults in `configs/agent-browser/config.json`
 
 `pi/` is a Git submodule pointing to [`earendil-works/pi`](https://github.com/earendil-works/pi). It is kept here as an implementation and documentation reference.

@@ -16,6 +16,7 @@ backup_copy() {
 }
 
 backup_copy "$ROOT/configs/pi/AGENTS.md" "$HOME/.pi/agent/AGENTS.md"
+backup_copy "$ROOT/configs/pi/web-search.json" "$HOME/.pi/web-search.json"
 backup_copy "$ROOT/configs/agent-browser/config.json" "$HOME/.agent-browser/config.json"
 
 # Install/update the Pi packages this setup expects. `pi install` is idempotent for already-installed packages.
