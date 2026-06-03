@@ -50,6 +50,16 @@ Commands provided by the package:
 - `/groundup` — enter GroundUp stance
 - `/pithagoras off` — clear the current stance
 
+Pithagoras works in small building blocks. Framing, Probe, and GroundUp all start from the user's current mental model, introduce one real-world constraint or decision point at a time, and stop at checkpoints.
+
+Harness workspace:
+
+- Framing writes only to `.pithagoras/framing.md`
+- Probe writes only to `.pithagoras/probe.md` or `.pithagoras/experiments/`
+- GroundUp may edit implementation files, one small slice at a time
+
+Agent-facing prompts and UI text are English. User-facing replies and written artifacts follow the user's language; code comments stay English.
+
 After installing or updating the package, restart Pi or run `/reload`.
 
 ## Current setup
