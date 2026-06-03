@@ -1,5 +1,6 @@
 {
   "packages": [
+    "git:github.com/NihilDigit/pithagoras",
     "npm:pi-resource-center",
     "npm:pi-web-access",
     "npm:@aliou/pi-guardrails"

@@ -5,13 +5,14 @@ Personal Pi setup for organizing and maintaining my own Pi environment.
 This repository contains two pieces:
 
 - a Pi package that provides the Pithagoras interaction stance extension
-- repo-managed snapshots of my personal Pi setup
+- machine-independent dotfiles for my personal Pi setup, including the custom Pi footer
 
 The setup snapshots are:
 
 - Pi user defaults in `configs/pi/AGENTS.md`
 - Pi system prompt append in `configs/pi/APPEND_SYSTEM.md`
 - Pi package expectations in `configs/pi/settings.json`
+- Pi footer extension in `configs/pi/extensions/pi-footer.ts`
 - `pi-web-access` defaults in `configs/pi/web-search.json`
 - `agent-browser` defaults in `configs/agent-browser/config.json`
 
@@ -62,10 +63,22 @@ Agent-facing prompts and UI text are English. User-facing replies and written ar
 
 After installing or updating the package, restart Pi or run `/reload`.
 
+## Dotfiles
+
+The files under `configs/` are the managed copies. `scripts/apply.sh` copies them into the local home directory and keeps machine-specific paths out of the repository.
+
+Footer source:
+
+- managed copy: `configs/pi/extensions/pi-footer.ts`
+- local runtime copy: `~/.pi/agent/extensions/pi-footer.ts`
+
+The footer is a compact single-line TUI status with current directory, git branch, worktree state, context usage, model, and thinking level. It uses Nerd Font icons and falls back to path truncation when the terminal is narrow.
+
 ## Current setup
 
 Pi packages:
 
+- `git:github.com/NihilDigit/pithagoras`
 - `npm:pi-resource-center`
 - `npm:pi-web-access`
 - `npm:@aliou/pi-guardrails`
@@ -87,7 +100,7 @@ Documentation fallback:
 ./scripts/apply.sh
 ```
 
-The script backs up existing target files before copying configs, installs the expected Pi packages, installs `agent-browser`, installs the `agent-browser` Agent Skill via `bunx skills`, and merges the package list into `~/.pi/agent/settings.json`.
+The script backs up existing target files before copying configs, installs the expected Pi packages, installs `agent-browser`, installs the `agent-browser` Agent Skill via `bunx skills`, and merges the package list into `~/.pi/agent/settings.json`. It copies the managed footer extension to `~/.pi/agent/extensions/pi-footer.ts`.
 
 After applying, restart Pi or run `/reload` where applicable.
 

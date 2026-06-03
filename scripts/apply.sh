@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 
-mkdir -p "$HOME/.pi/agent" "$HOME/.agent-browser"
+mkdir -p "$HOME/.pi/agent/extensions" "$HOME/.agent-browser"
 
 backup_copy() {
   local src="$1"
@@ -18,9 +18,11 @@ backup_copy() {
 backup_copy "$ROOT/configs/pi/AGENTS.md" "$HOME/.pi/agent/AGENTS.md"
 backup_copy "$ROOT/configs/pi/APPEND_SYSTEM.md" "$HOME/.pi/agent/APPEND_SYSTEM.md"
 backup_copy "$ROOT/configs/pi/web-search.json" "$HOME/.pi/web-search.json"
+backup_copy "$ROOT/configs/pi/extensions/pi-footer.ts" "$HOME/.pi/agent/extensions/pi-footer.ts"
 backup_copy "$ROOT/configs/agent-browser/config.json" "$HOME/.agent-browser/config.json"
 
 # Install/update the Pi packages this setup expects. `pi install` is idempotent for already-installed packages.
+pi install git:github.com/NihilDigit/pithagoras || true
 pi install npm:pi-resource-center || true
 pi install npm:pi-web-access || true
 pi install npm:@aliou/pi-guardrails || true
@@ -39,8 +41,9 @@ base = {}
 if dst.exists():
     base = json.loads(dst.read_text())
 setup = json.loads(src.read_text())
+base.setdefault('packages', [])
+base['packages'] = [package for package in base['packages'] if package != os.environ['ROOT']]
 for package in setup.get('packages', []):
-    base.setdefault('packages', [])
     if package not in base['packages']:
         base['packages'].append(package)
 dst.write_text(json.dumps(base, indent=2, ensure_ascii=False) + '\n')
