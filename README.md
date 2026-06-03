@@ -78,15 +78,15 @@ The package also includes `sudo-gate`, a small companion for agent `bash` comman
 What it does:
 
 - detects `sudo` in agent bash tool calls;
-- asks for explicit approval in Pi before the command runs;
-- asks for the sudo password in a masked Pi input when the session has no cached password;
+- opens a centered masked Pi password popup when the session has no cached password;
+- treats cancelling the popup as a user decision and reports it back to the agent;
 - keeps the password in extension memory until session shutdown, `/reload`, `/sudo-gate forget`, or an authentication failure;
 - creates a local askpass client under `~/.pi/agent/sudo-gate/`;
-- serves the password through a per-process Unix socket using one-use tokens;
+- serves the password through a per-process Unix socket using short-lived per-command tokens;
 - runs sudo through `sudo -A` internally while the agent keeps writing normal `sudo ...` commands;
 - blocks `sudo -S`, `--stdin`, `-n`, `--non-interactive`, password piping, and custom `SUDO_ASKPASS`.
 
-It does not write the sudo password to disk or into the shell command/environment. The generated askpass client contains no password; it only asks the in-memory broker for a password after Pi has approved that specific sudo command.
+It does not write the sudo password to disk or into the shell command/environment. The generated askpass client contains no password; it only asks the in-memory broker for a password after Pi has opened the sudo password flow for that command.
 
 After installing or updating the package, restart Pi or run `/reload`.
 

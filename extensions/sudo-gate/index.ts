@@ -16,6 +16,7 @@ interface SudoGateState {
 
 interface PendingToken {
 	expiresAt: number;
+	remainingUses: number;
 }
 
 const DEFAULT_STATE: SudoGateState = { enabled: true };
@@ -130,15 +131,15 @@ real="\${PI_SUDO_GATE_REAL_SUDO:-${realSudo}}"
 args=()
 for arg in "$@"; do
   case "$arg" in
-    --stdin|--non-interactive)
+    --stdin)
       echo "sudo-gate: blocked sudo option: $arg" >&2
       exit 1
       ;;
-    -[!-]*[Sn]*|-[!-]*[nS]*)
-      echo "sudo-gate: blocked sudo option containing -S or -n: $arg" >&2
+    -[!-]*S*)
+      echo "sudo-gate: blocked sudo option containing -S: $arg" >&2
       exit 1
       ;;
-    -A|--askpass)
+    -A|--askpass|-n|--non-interactive|-[!-]*n*)
       ;;
     *)
       args+=("$arg")
@@ -173,8 +174,8 @@ function commandMentionsSudo(command: string): boolean {
 }
 
 function unsafeSudoReason(command: string): string | undefined {
-	if (/\bsudo(?:edit)?\b[^\n;&|]*?(?:\s-[^\s;&|]*[Sn][^\s;&|]*\b|\s--stdin\b|\s--non-interactive\b)/.test(command)) {
-		return "sudo-gate: sudo stdin and non-interactive authentication options are blocked. Use normal sudo syntax and let the user decide the next step.";
+	if (/\bsudo(?:edit)?\b[^\n;&|]*?(?:\s-[^\s;&|]*S[^\s;&|]*\b|\s--stdin\b)/.test(command)) {
+		return "sudo-gate: sudo stdin authentication is blocked. Use normal sudo syntax and let the user decide the next step.";
 	}
 	if (/(^|[\s;&|])SUDO_ASKPASS\s*=/.test(command)) {
 		return "sudo-gate: custom SUDO_ASKPASS is blocked. Use normal sudo syntax and let the user decide the next step.";
@@ -190,7 +191,28 @@ function normalizeSudoCommand(command: string): string {
 }
 
 function withSudoFunctions(command: string): string {
-	return `sudo() { command "$PI_SUDO_GATE_REAL_SUDO" -A "$@"; }
+	return `sudo() {
+  local args=()
+  local arg
+  for arg in "$@"; do
+    case "$arg" in
+      --stdin)
+        echo "sudo-gate: blocked sudo option: $arg" >&2
+        return 1
+        ;;
+      -[!-]*S*)
+        echo "sudo-gate: blocked sudo option containing -S: $arg" >&2
+        return 1
+        ;;
+      -A|--askpass|-n|--non-interactive|-[!-]*n*)
+        ;;
+      *)
+        args+=("$arg")
+        ;;
+    esac
+  done
+  command "$PI_SUDO_GATE_REAL_SUDO" -A "\${args[@]}"
+}
 sudoedit() { command "$PI_SUDO_GATE_REAL_SUDO" -A -e "$@"; }
 ${normalizeSudoCommand(command)}`;
 }
@@ -212,7 +234,7 @@ async function askPassword(ctx: {
 	ui: {
 		custom<T>(factory: (tui: { requestRender(): void }, theme: { fg(name: string, text: string): string; bold(text: string): string }, keybindings: unknown, done: (value: T) => void) => unknown, options?: unknown): Promise<T>;
 	};
-}): Promise<string | undefined> {
+}, message = "Enter sudo password for this Pi session"): Promise<string | undefined> {
 	return ctx.ui.custom<string | undefined>(
 		(tui, theme, _keybindings, done) => {
 			let value = "";
@@ -237,7 +259,7 @@ async function askPassword(ctx: {
 					cache = [
 						`┌${"─".repeat(innerWidth)}┐`,
 						boxedLine(` ${theme.fg("accent", theme.bold("sudo-gate password"))}`, innerWidth),
-						boxedLine(` ${theme.fg("muted", "Enter sudo password for this Pi session")}`, innerWidth),
+						boxedLine(` ${theme.fg("muted", message)}`, innerWidth),
 						boxedLine("", innerWidth),
 						boxedLine(` ${theme.fg("accent", "> ")}${input}`, innerWidth),
 						boxedLine("", innerWidth),
@@ -302,7 +324,7 @@ export default function sudoGate(pi: ExtensionAPI): void {
 
 	function issueToken(): string {
 		const token = randomBytes(24).toString("base64url");
-		pendingTokens.set(token, { expiresAt: Date.now() + TOKEN_TTL_MS });
+		pendingTokens.set(token, { expiresAt: Date.now() + TOKEN_TTL_MS, remainingUses: 3 });
 		return token;
 	}
 
@@ -334,8 +356,7 @@ export default function sudoGate(pi: ExtensionAPI): void {
 				}
 
 				const pending = pendingTokens.get(token);
-				pendingTokens.delete(token);
-				if (!pending || pending.expiresAt < Date.now()) {
+				if (!pending || pending.expiresAt < Date.now() || pending.remainingUses <= 0) {
 					socket.end(JSON.stringify({ ok: false, error: "sudo-gate: password request expired or was not approved" }) + "\n");
 					return;
 				}
@@ -343,6 +364,7 @@ export default function sudoGate(pi: ExtensionAPI): void {
 					socket.end(JSON.stringify({ ok: false, error: "sudo-gate: no session password is available" }) + "\n");
 					return;
 				}
+				pending.remainingUses -= 1;
 				socket.end(JSON.stringify({ ok: true, password: sudoPassword }) + "\n");
 			});
 		});
@@ -409,63 +431,69 @@ export default function sudoGate(pi: ExtensionAPI): void {
 
 			if (!ctx.hasUI) {
 				return {
-					content: [{ type: "text", text: "sudo-gate: sudo requires interactive user approval in Pi." }],
+					content: [{ type: "text", text: "sudo-gate: sudo requires interactive user authentication in Pi." }],
 					details: { blocked: true },
 					isError: true,
 				};
 			}
 
-			const ok = await ctx.ui.confirm("sudo-gate", `Allow this sudo command?\n\n${truncateCommand(command)}`);
-			if (!ok) {
-				return {
-					content: [
-						{
-							type: "text",
-							text: "sudo-gate: user denied this sudo command. Treat this as a user decision and choose a non-privileged next step or ask the user how to proceed.",
-						},
-					],
-					details: { blocked: true, deniedByUser: true },
-					isError: true,
-				};
-			}
-
-			if (!sudoPassword) {
-				sudoPassword = await askPassword(ctx);
+			const ensurePassword = async (message?: string) => {
+				if (sudoPassword) return true;
+				sudoPassword = await askPassword(ctx, message);
 				setStatus(ctx, state, Boolean(sudoPassword));
-				if (!sudoPassword) {
-					return {
-						content: [
-							{
-								type: "text",
-								text: "sudo-gate: user cancelled sudo authentication. Treat this as a user decision and choose a non-privileged next step or ask the user how to proceed.",
-							},
-						],
-						details: { blocked: true, authenticationCancelled: true },
-						isError: true,
-					};
-				}
-			}
+				return Boolean(sudoPassword);
+			};
 
-			const files = ensureRuntimeFiles();
-			const socket = await ensureBroker();
-			const token = issueToken();
-			const tool = createBashTool(ctx.cwd, {
-				spawnHook: ({ command, cwd, env }) => ({
-					command: withSudoFunctions(command),
-					cwd,
-					env: {
-						...env,
-						SUDO_ASKPASS: files.askpass,
-						SUDO_GATE_SOCKET: socket,
-						SUDO_GATE_TOKEN: token,
-						PI_SUDO_GATE_REAL_SUDO: files.realSudo,
-						PATH: `${files.dir}:${env.PATH ?? process.env.PATH ?? ""}`,
+			const cancelled = (retry: boolean) => ({
+				content: [
+					{
+						type: "text" as const,
+						text: retry
+							? "sudo-gate: user cancelled the sudo password retry. Treat this as a user decision and choose a non-privileged next step or ask the user how to proceed."
+							: "sudo-gate: user cancelled sudo authentication. Treat this as a user decision and choose a non-privileged next step or ask the user how to proceed.",
 					},
-				}),
+				],
+				details: { blocked: true, authenticationCancelled: true, retry },
+				isError: true,
 			});
 
-			const result = await tool.execute(toolCallId, params, signal, onUpdate);
-			const text = result.content.map((item) => (item.type === "text" ? item.text : "")).join("\n");
+			const runWithCurrentPassword = async () => {
+				const files = ensureRuntimeFiles();
+				const socket = await ensureBroker();
+				const token = issueToken();
+				const tool = createBashTool(ctx.cwd, {
+					spawnHook: ({ command, cwd, env }) => ({
+						command: withSudoFunctions(command),
+						cwd,
+						env: {
+							...env,
+							SUDO_ASKPASS: files.askpass,
+							SUDO_GATE_SOCKET: socket,
+							SUDO_GATE_TOKEN: token,
+							PI_SUDO_GATE_REAL_SUDO: files.realSudo,
+							PATH: `${files.dir}:${env.PATH ?? process.env.PATH ?? ""}`,
+						},
+					}),
+				});
+				try {
+					return await tool.execute(toolCallId, params, signal, onUpdate);
+				} finally {
+					pendingTokens.delete(token);
+				}
+			};
+
+			if (!(await ensurePassword())) return cancelled(false);
+
+			let result = await runWithCurrentPassword();
+			let text = result.content.map((item) => (item.type === "text" ? item.text : "")).join("\n");
+			if (!looksLikeSudoAuthFailure(text)) return result;
+
+			clearPassword();
+			setStatus(ctx, state, false);
+			if (!(await ensurePassword("sudo authentication failed; try once more"))) return cancelled(true);
+
+			result = await runWithCurrentPassword();
+			text = result.content.map((item) => (item.type === "text" ? item.text : "")).join("\n");
 			if (looksLikeSudoAuthFailure(text)) {
 				clearPassword();
 				setStatus(ctx, state, false);
