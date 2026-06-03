@@ -4,7 +4,7 @@ Personal Pi setup for organizing and maintaining my own Pi environment.
 
 This repository contains two pieces:
 
-- a Pi package that provides the Pithagoras interaction stance extension
+- a Pi package that provides the Pithagoras interaction stance extension and sudo-gate
 - machine-independent dotfiles for my personal Pi setup, including the custom Pi footer
 
 The setup snapshots are:
@@ -50,6 +50,10 @@ Commands provided by the package:
 - `/probe` — enter Probe stance
 - `/groundup` — enter GroundUp stance
 - `/pithagoras off` — clear the current stance
+- `/sudo-gate` — show sudo-gate status
+- `/sudo-gate on|off` — enable or disable sudo-gate for this session branch
+- `/sudo-gate paths` — show generated askpass, sudo wrapper, and broker socket paths
+- `/sudo-gate forget` — clear the session sudo password from memory
 
 Pithagoras works in small building blocks. Each stance uses an abstraction ladder so the user can follow the work before internal names appear:
 
@@ -66,6 +70,23 @@ Harness workspace:
 - GroundUp edits implementation as one coherent vertical slice at a time. A slice may touch a small related module cluster when the constraint requires wiring, tests, or UI/data pairs.
 
 Agent-facing prompts and UI text are English. User-facing replies and written artifacts follow the user's language; code comments stay English.
+
+### sudo-gate
+
+The package also includes `sudo-gate`, a small companion for agent `bash` commands that need `sudo`.
+
+What it does:
+
+- detects `sudo` in agent bash tool calls;
+- asks for explicit approval in Pi before the command runs;
+- asks for the sudo password in a masked Pi input when the session has no cached password;
+- keeps the password in extension memory until session shutdown, `/reload`, `/sudo-gate forget`, or an authentication failure;
+- creates a local askpass client under `~/.pi/agent/sudo-gate/`;
+- serves the password through a per-process Unix socket using one-use tokens;
+- runs sudo through `sudo -A` internally while the agent keeps writing normal `sudo ...` commands;
+- blocks `sudo -S`, `--stdin`, `-n`, `--non-interactive`, password piping, and custom `SUDO_ASKPASS`.
+
+It does not write the sudo password to disk or into the shell command/environment. The generated askpass client contains no password; it only asks the in-memory broker for a password after Pi has approved that specific sudo command.
 
 After installing or updating the package, restart Pi or run `/reload`.
 
