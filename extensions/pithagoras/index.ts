@@ -99,25 +99,50 @@ function restoreState(ctx: ExtensionContext): PithagorasState {
 	return state;
 }
 
+function stanceGuide(stance: Stance | undefined): string[] | undefined {
+	if (stance === "frame") {
+		return [
+			"Pithagoras · Framing",
+			"user baseline → visible model → mechanism words → decision point",
+		];
+	}
+	if (stance === "probe") {
+		return [
+			"Pithagoras · Probe",
+			"visible doubt → testable hypothesis → cheap evidence → model update",
+		];
+	}
+	if (stance === "groundup") {
+		return [
+			"Pithagoras · GroundUp",
+			"visible change → runtime mechanism → code object → coherent slice",
+		];
+	}
+	return undefined;
+}
+
 function setStatus(ctx: ExtensionContext, state: PithagorasState): void {
 	if (!state.stance) {
 		ctx.ui.setStatus("pithagoras", undefined);
+		ctx.ui.setWidget("pithagoras-guide", undefined);
 		return;
 	}
 
 	const label = stanceLabel(state.stance);
 	const suffix = state.stance === "groundup" ? ` · slice ${state.groundup.slice} · ${state.groundup.substate}` : ` · block ${state.block}`;
 	ctx.ui.setStatus("pithagoras", ctx.ui.theme.fg("accent", `pithagoras:${label}${suffix}`));
+	ctx.ui.setWidget("pithagoras-guide", stanceGuide(state.stance));
 }
 
 function corePrinciplePrompt(): string {
 	return `Pithagoras core principle.
 
-Work from the user's current mental model. First build a rough model the user can inspect, then add real-world constraints one at a time.
+Work from the user's current mental model. Use this abstraction ladder before details: user-visible behavior, runtime mechanism, code object.
 Every concept, document block, experiment, code structure, and abstraction must come from a visible decision point or constraint.
 
 Move in small building blocks. Do not produce complete documents, complete architectures, or complete implementations in one pass.
 Keep written artifacts progressive: one stable block at a time, with unknowns left visible.
+Do not make the user extract the model through repeated clarification. If the user asks "what is this?", "which helper?", or otherwise signals confusion, stop advancing and re-orient at the right abstraction layer.
 Follow the user's language for normal replies and written artifacts. Keep code comments in English.
 A successful session leaves the user able to explain why each part of the final solution exists.`;
 }
@@ -128,10 +153,13 @@ function framePrompt(): string {
 Use this stance when the user's idea is still informal.
 Your job is to help the user and agent arrive at a shared, checkable framing of the work.
 
-Start by understanding the user's current mental model: what they know, what they vaguely recognize, what assumptions they are making, and what knowledge gaps would block them from judging the framing.
-Use diagnostic questions when needed. Questions should reveal how the user thinks about the system, not merely collect requirements.
+Framing uses this ladder: user knowledge baseline → user-visible model → mechanism vocabulary → decision point.
+The first Framing block must establish a user-checkable knowledge baseline before proposing a structure: what the user already knows, what they can recognize when named, what they are unsure about, and which concepts they need in order to judge the framing.
+Ask at least one diagnostic question when the user's knowledge level is ambiguous. The question should reveal how the user thinks about the system, not merely collect requirements.
 If a knowledge gap blocks participation, teach the missing concept in the context of the user's problem before continuing.
+Do not proceed as if the user already knows internal code objects, architecture names, or framework concepts unless they have shown that knowledge in the conversation.
 
+When a block stabilizes, write it in the user's inspectable terms first. Internal names belong only after their user-visible role is clear.
 Use your own knowledge, light web research, GitHub projects, papers, existing tools, and analogous domains to check whether the idea already exists, is partially solved, or is isomorphic to a known problem.
 Prefer reuse, adaptation, and borrowing from adjacent work over invention from scratch.
 
@@ -146,8 +174,10 @@ Use this stance after a framing exists.
 Your job is to test whether the framed engineering problem and the architecture in your head survive contact with reality.
 Use docs, source code, runtime behavior, experiments, spikes, comparable projects, and the user's domain knowledge.
 
-Probe one hypothesis or experiment per assistant turn. Before reading, searching, running code, or writing a spike, briefly say what you are trying to verify and why this action is cheap useful evidence.
+Probe uses this ladder: user-visible doubt → testable hypothesis → cheap evidence → model update.
+Probe one hypothesis or experiment per assistant turn. Before reading, searching, running code, or writing a spike, briefly say what user-visible doubt you are testing, what evidence would change the model, and why this action is cheap.
 After the action, explain what became more likely, less likely, contradicted, or still unknown. Do not roll multiple experiments into one turn.
+Do not treat source-code names as evidence by themselves. Tie every code path, log, test, or artifact back to the user's visible behavior or mental model.
 
 Written Probe work belongs in ${PITHAGORAS_DIR}/probe.md or ${PITHAGORAS_DIR}/experiments/.
 Do not write docs/probe.md or implementation files during Probe. Probe artifacts are evidence-gathering building blocks unless the user explicitly moves to GroundUp.`;
@@ -176,13 +206,19 @@ Start from a spherical-cow version: the simplest useful fiction that makes the c
 
 Current slice: ${state.groundup.slice}.
 
+GroundUp uses this ladder: user-visible change → runtime mechanism → code object → coherent slice.
 For each assistant turn:
 - absorb exactly one real constraint into the implementation;
-- start by naming the simplifying assumption for this turn;
+- start with a short orientation before touching tools:
+  1. Visible change: what the user will observe;
+  2. Mechanism: what has to happen at runtime, in plain language;
+  3. Code target: which file/function/object owns that mechanism and why;
+  4. Non-goals: what stays unchanged in this slice.
+- do not introduce helper names, framework terms, or internal abstractions without first explaining their role in the current mechanism;
 - make the smallest coherent vertical slice that demonstrates or handles that assumption;
 - allow the slice to grow from one line into a small related module cluster when the current constraint requires wiring, tests, or UI/data pairs;
 - keep rollback cheap: if the slice reveals the design is wrong, stop, explain what failed, and ask whether to reframe before piling on more code;
-- explain the change in plain language;
+- explain the change in plain language using the user's mental model first, then implementation names second;
 - end by naming the next wall this version will hit, then stop.
 
 Advanced structure should appear only when the previous simple version has met a concrete constraint that requires it.
@@ -217,6 +253,22 @@ function countEditBlocks(input: Record<string, unknown>): number {
 function writeBytes(input: Record<string, unknown>): number {
 	const content = input.content;
 	return typeof content === "string" ? content.length : 0;
+}
+
+function checkpointHelp(stance: Stance): string {
+	if (stance === "frame") return "Enter: next framing block · Ask: clarify baseline/model/decision · Esc: pause";
+	if (stance === "probe") return "Enter: next hypothesis · Ask: challenge evidence/model update · Esc: pause";
+	return "Enter: next vertical slice · Ask: re-orient visible/mechanism/code layer · Esc: pause";
+}
+
+function continueInstruction(stance: Stance): string {
+	if (stance === "frame") {
+		return "Continue Framing. Advance only the next block on the ladder: user baseline, visible model, mechanism vocabulary, or decision point. Do not skip the user's knowledge level.";
+	}
+	if (stance === "probe") {
+		return "Continue Probe. Test one user-visible doubt with one cheap piece of evidence, then update the model. Do not bundle multiple experiments.";
+	}
+	return "Continue GroundUp. Do one coherent vertical slice. Start with visible change, runtime mechanism, code target, and non-goals before touching tools.";
 }
 
 function consumeGroundUpBudget(event: { toolName: string; input: Record<string, unknown> }, budget: SliceBudget) {
@@ -452,7 +504,7 @@ export default function pithagoras(pi: ExtensionAPI): void {
 		persist(pi, state);
 		setStatus(ctx, state);
 
-		const question = await ctx.ui.input(`${stanceLabel(state.stance)} checkpoint`, "Press Enter to continue one small block; type a question to clarify; Esc to pause");
+		const question = await ctx.ui.input(`${stanceLabel(state.stance)} checkpoint`, checkpointHelp(state.stance));
 		if (question === undefined) return;
 
 		const trimmed = question.trim();
@@ -464,7 +516,7 @@ export default function pithagoras(pi: ExtensionAPI): void {
 			}
 			persist(pi, state);
 			setStatus(ctx, state);
-			await pi.sendUserMessage(`Continue ${stanceLabel(state.stance)}. Advance only the next small building block, and add only one real-world constraint or decision point.`, {
+			await pi.sendUserMessage(continueInstruction(state.stance), {
 				deliverAs: "followUp",
 			});
 			return;

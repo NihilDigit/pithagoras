@@ -51,7 +51,13 @@ Commands provided by the package:
 - `/groundup` — enter GroundUp stance
 - `/pithagoras off` — clear the current stance
 
-Pithagoras works in small building blocks. Framing, Probe, and GroundUp all start from the user's current mental model, introduce one real-world constraint or decision point at a time, and stop at checkpoints.
+Pithagoras works in small building blocks. Each stance uses an abstraction ladder so the user can follow the work before internal names appear:
+
+- Framing: user knowledge baseline → user-visible model → mechanism vocabulary → decision point.
+- Probe: user-visible doubt → testable hypothesis → cheap evidence → model update.
+- GroundUp: user-visible change → runtime mechanism → code object → coherent slice.
+
+The extension shows the active ladder in the TUI while a stance is enabled. GroundUp must orient the user around visible behavior, runtime mechanism, code target, and non-goals before touching tools.
 
 Harness workspace:
 
