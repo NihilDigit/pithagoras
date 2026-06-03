@@ -46,10 +46,10 @@ const MAX_GROUNDUP_EDIT_BLOCKS = 2;
 const MAX_GROUNDUP_WRITE_BYTES = 3000;
 const MAX_FRAME_EDIT_BLOCKS = 1;
 const MAX_FRAME_WRITE_BYTES = 2000;
-const MAX_FRAME_BASH_CALLS = 2;
+const MAX_FRAME_BASH_CALLS = 8;
 const MAX_PROBE_EDIT_BLOCKS = 2;
 const MAX_PROBE_WRITE_BYTES = 5000;
-const MAX_PROBE_BASH_CALLS = 4;
+const MAX_PROBE_BASH_CALLS = 8;
 
 function cloneState(state: PithagorasState): PithagorasState {
 	return {
