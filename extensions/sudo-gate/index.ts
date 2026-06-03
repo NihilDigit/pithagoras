@@ -171,22 +171,174 @@ exec "$real" -A -e "$@"
 	return { dir, askpass, wrapper, sudoeditWrapper, realSudo };
 }
 
+type ShellToken = { kind: "word" | "op"; text: string };
+
+function tokenizeShell(command: string): ShellToken[] {
+	const tokens: ShellToken[] = [];
+	let word = "";
+	let quote: "single" | "double" | undefined;
+	let escaped = false;
+
+	function pushWord(): void {
+		if (!word) return;
+		tokens.push({ kind: "word", text: word });
+		word = "";
+	}
+
+	function pushOp(text: string): void {
+		pushWord();
+		tokens.push({ kind: "op", text });
+	}
+
+	for (let i = 0; i < command.length; i += 1) {
+		const ch = command[i]!;
+		const next = command[i + 1];
+
+		if (quote === "single") {
+			if (ch === "'") quote = undefined;
+			else word += ch;
+			continue;
+		}
+
+		if (quote === "double") {
+			if (escaped) {
+				word += ch;
+				escaped = false;
+				continue;
+			}
+			if (ch === "\\") {
+				escaped = true;
+				continue;
+			}
+			if (ch === '"') quote = undefined;
+			else word += ch;
+			continue;
+		}
+
+		if (escaped) {
+			word += ch;
+			escaped = false;
+			continue;
+		}
+		if (ch === "\\") {
+			escaped = true;
+			continue;
+		}
+		if (ch === "'") {
+			quote = "single";
+			continue;
+		}
+		if (ch === '"') {
+			quote = "double";
+			continue;
+		}
+		if (ch === "#" && !word) {
+			while (i < command.length && command[i] !== "\n") i += 1;
+			pushOp("\n");
+			continue;
+		}
+		if (ch === "\n") {
+			pushOp("\n");
+			continue;
+		}
+		if (/\s/.test(ch)) {
+			pushWord();
+			continue;
+		}
+		if ((ch === "&" && next === "&") || (ch === "|" && next === "|")) {
+			pushOp(ch + next);
+			i += 1;
+			continue;
+		}
+		if (";|&()<>".includes(ch)) {
+			pushOp(ch);
+			continue;
+		}
+		word += ch;
+	}
+	pushWord();
+	return tokens;
+}
+
+function isCommandSeparator(token: ShellToken): boolean {
+	return token.kind === "op" && [";", "&&", "||", "|", "&", "\n", "("].includes(token.text);
+}
+
+function isAssignmentWord(word: string): boolean {
+	return /^[A-Za-z_][A-Za-z0-9_]*=.*/.test(word);
+}
+
+function isSudoWord(word: string): boolean {
+	return /^(?:sudo|sudoedit|\/(?:usr\/bin|bin|usr\/local\/bin)\/(?:sudo|sudoedit))$/.test(word);
+}
+
+function findSudoInvocationIndexes(command: string): number[] {
+	const tokens = tokenizeShell(command);
+	const indexes: number[] = [];
+	let commandStart = true;
+	let envMode = false;
+
+	for (let i = 0; i < tokens.length; i += 1) {
+		const token = tokens[i]!;
+		if (token.kind === "op") {
+			if (isCommandSeparator(token)) {
+				commandStart = true;
+				envMode = false;
+			}
+			continue;
+		}
+
+		const word = token.text;
+		if (envMode) {
+			if (word === "--" || word.startsWith("-") || isAssignmentWord(word)) continue;
+			if (isSudoWord(word)) indexes.push(i);
+			commandStart = false;
+			envMode = false;
+			continue;
+		}
+
+		if (!commandStart) continue;
+		if (isAssignmentWord(word)) continue;
+		if (["command", "exec", "time"].includes(word)) continue;
+		if (word === "env") {
+			envMode = true;
+			continue;
+		}
+		if (isSudoWord(word)) indexes.push(i);
+		commandStart = false;
+	}
+	return indexes;
+}
+
 function commandMentionsSudo(command: string): boolean {
-	return (
-		/(^|[^\w./-])(?:sudo|sudoedit)(?=\s|$)/.test(command) ||
-		/(^|\s)\/(?:usr\/bin|bin|usr\/local\/bin)\/sudo(?=\s|$)/.test(command)
-	);
+	return findSudoInvocationIndexes(command).length > 0;
+}
+
+function sudoInvocationUsesStdinAuth(command: string): boolean {
+	const tokens = tokenizeShell(command);
+	const sudoIndexes = new Set(findSudoInvocationIndexes(command));
+	for (const index of sudoIndexes) {
+		for (let i = index + 1; i < tokens.length; i += 1) {
+			const token = tokens[i]!;
+			if (isCommandSeparator(token)) break;
+			if (token.kind !== "word") continue;
+			const word = token.text;
+			if (word === "--") break;
+			if (word === "--stdin" || /^-[^-].*S/.test(word)) return true;
+			if (word.startsWith("-")) continue;
+			if (isAssignmentWord(word)) continue;
+			break;
+		}
+	}
+	return false;
 }
 
 function unsafeSudoReason(command: string): string | undefined {
-	if (/\bsudo(?:edit)?\b[^\n;&|]*?(?:\s-S\b|\s--stdin\b)/.test(command)) {
+	if (sudoInvocationUsesStdinAuth(command)) {
 		return "sudo-gate: sudo stdin authentication is blocked. Use normal sudo syntax and let the user decide the next step.";
 	}
 	if (/(^|[\s;&|])SUDO_ASKPASS\s*=/.test(command)) {
 		return "sudo-gate: custom SUDO_ASKPASS is blocked. Use normal sudo syntax and let the user decide the next step.";
-	}
-	if (/\b(?:echo|printf|cat)\b[^\n;&|]*\|[^\n;&|]*\bsudo\b/.test(command)) {
-		return "sudo-gate: piping data into sudo is blocked. Use normal sudo syntax and let the user decide the next step.";
 	}
 	return undefined;
 }
