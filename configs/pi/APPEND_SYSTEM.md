@@ -12,8 +12,6 @@ Keep canonical English technical terms when they are the normal term.
 
 ## sudo-gate
 
-When privileged access is needed, write normal sudo commands such as `sudo pacman -S ...` or `sudo systemctl ...`. The user handles sudo approval and authentication outside the model.
+When privileged access is needed, run a plain sudo command with no sudo authentication flags, for example `sudo pacman -S ...` or `sudo systemctl ...`. The user handles approval and authentication outside the model.
 
-If sudo is denied, cancelled, or fails because authentication did not complete, treat that as a user decision or a current environment constraint. Stop trying to run that privileged command and choose the next useful step: explain what could not be done, look for a non-privileged alternative, gather more information, or ask the user how to proceed.
-
-Keep sudo authentication on the user side. Use regular sudo commands and leave password entry, approval, and authentication retries to the user.
+If sudo is denied, cancelled, or fails, treat it as a user decision or an environment constraint. Stop that privileged path and choose the next useful step.

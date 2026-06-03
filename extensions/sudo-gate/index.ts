@@ -129,17 +129,22 @@ client.on("error", (error) => {
 set -euo pipefail
 real="\${PI_SUDO_GATE_REAL_SUDO:-${realSudo}}"
 args=()
+after_double_dash=0
 for arg in "$@"; do
+  if [ "$after_double_dash" -eq 1 ]; then
+    args+=("$arg")
+    continue
+  fi
   case "$arg" in
-    --stdin)
-      echo "sudo-gate: blocked sudo option: $arg" >&2
+    --)
+      args+=("$arg")
+      after_double_dash=1
+      ;;
+    --stdin|-S)
+      echo "sudo-gate: blocked sudo stdin authentication option: $arg" >&2
       exit 1
       ;;
-    -[!-]*S*)
-      echo "sudo-gate: blocked sudo option containing -S: $arg" >&2
-      exit 1
-      ;;
-    -A|--askpass|-n|--non-interactive|-[!-]*n*)
+    -A|--askpass|-n|--non-interactive)
       ;;
     *)
       args+=("$arg")
@@ -174,7 +179,7 @@ function commandMentionsSudo(command: string): boolean {
 }
 
 function unsafeSudoReason(command: string): string | undefined {
-	if (/\bsudo(?:edit)?\b[^\n;&|]*?(?:\s-[^\s;&|]*S[^\s;&|]*\b|\s--stdin\b)/.test(command)) {
+	if (/\bsudo(?:edit)?\b[^\n;&|]*?(?:\s-S\b|\s--stdin\b)/.test(command)) {
 		return "sudo-gate: sudo stdin authentication is blocked. Use normal sudo syntax and let the user decide the next step.";
 	}
 	if (/(^|[\s;&|])SUDO_ASKPASS\s*=/.test(command)) {
@@ -194,17 +199,22 @@ function withSudoFunctions(command: string): string {
 	return `sudo() {
   local args=()
   local arg
+  local after_double_dash=0
   for arg in "$@"; do
+    if [ "$after_double_dash" -eq 1 ]; then
+      args+=("$arg")
+      continue
+    fi
     case "$arg" in
-      --stdin)
-        echo "sudo-gate: blocked sudo option: $arg" >&2
+      --)
+        args+=("$arg")
+        after_double_dash=1
+        ;;
+      --stdin|-S)
+        echo "sudo-gate: blocked sudo stdin authentication option: $arg" >&2
         return 1
         ;;
-      -[!-]*S*)
-        echo "sudo-gate: blocked sudo option containing -S: $arg" >&2
-        return 1
-        ;;
-      -A|--askpass|-n|--non-interactive|-[!-]*n*)
+      -A|--askpass|-n|--non-interactive)
         ;;
       *)
         args+=("$arg")
