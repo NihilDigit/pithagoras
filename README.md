@@ -57,7 +57,7 @@ Harness workspace:
 
 - Framing writes only to `.pithagoras/framing.md`
 - Probe writes only to `.pithagoras/probe.md` or `.pithagoras/experiments/`
-- GroundUp may edit implementation files, one small slice at a time
+- GroundUp edits implementation as one coherent vertical slice at a time. A slice may touch a small related module cluster when the constraint requires wiring, tests, or UI/data pairs.
 
 Agent-facing prompts and UI text are English. User-facing replies and written artifacts follow the user's language; code comments stay English.
 

@@ -38,12 +38,12 @@ const DEFAULT_STATE: PithagorasState = {
 const PITHAGORAS_DIR = ".pithagoras";
 const MAX_ASSISTANT_CHARS = 2000;
 const MAX_GROUNDUP_ASSISTANT_CHARS = 1800;
-const MAX_GROUNDUP_EDIT_CALLS = 1;
-const MAX_GROUNDUP_WRITE_CALLS = 1;
-const MAX_GROUNDUP_BASH_CALLS = 2;
-const MAX_GROUNDUP_FILES = 1;
-const MAX_GROUNDUP_EDIT_BLOCKS = 2;
-const MAX_GROUNDUP_WRITE_BYTES = 3000;
+const MAX_GROUNDUP_EDIT_CALLS = 3;
+const MAX_GROUNDUP_WRITE_CALLS = 2;
+const MAX_GROUNDUP_BASH_CALLS = 6;
+const MAX_GROUNDUP_FILES = 4;
+const MAX_GROUNDUP_EDIT_BLOCKS = 8;
+const MAX_GROUNDUP_WRITE_BYTES = 8000;
 const MAX_FRAME_EDIT_BLOCKS = 1;
 const MAX_FRAME_WRITE_BYTES = 2000;
 const MAX_FRAME_BASH_CALLS = 8;
@@ -179,12 +179,14 @@ Current slice: ${state.groundup.slice}.
 For each assistant turn:
 - absorb exactly one real constraint into the implementation;
 - start by naming the simplifying assumption for this turn;
-- make the smallest code change that demonstrates or handles that assumption;
-- explain the small change in plain language;
+- make the smallest coherent vertical slice that demonstrates or handles that assumption;
+- allow the slice to grow from one line into a small related module cluster when the current constraint requires wiring, tests, or UI/data pairs;
+- keep rollback cheap: if the slice reveals the design is wrong, stop, explain what failed, and ask whether to reframe before piling on more code;
+- explain the change in plain language;
 - end by naming the next wall this version will hit, then stop.
 
 Advanced structure should appear only when the previous simple version has met a concrete constraint that requires it.
-If the next change would be large, split it and do only the first slice.
+If the next change would span unrelated subsystems, split it and do only the first coherent slice.
 The extension will ask the user whether to continue or ask a question. Do not continue to the next slice in the same response.`;
 }
 
@@ -219,16 +221,17 @@ function writeBytes(input: Record<string, unknown>): number {
 
 function consumeGroundUpBudget(event: { toolName: string; input: Record<string, unknown> }, budget: SliceBudget) {
 	const path = touchedPath(event.toolName, event.input);
-	if (path) budget.touchedFiles.add(path);
+	const isWriteTool = event.toolName === "edit" || event.toolName === "write";
+	if (path && isWriteTool) budget.touchedFiles.add(path);
 
-	if (budget.touchedFiles.size > MAX_GROUNDUP_FILES && (event.toolName === "edit" || event.toolName === "write")) {
-		return "GroundUp slice is too large: touch only one implementation file in this slice.";
+	if (budget.touchedFiles.size > MAX_GROUNDUP_FILES) {
+		return `GroundUp slice is too large: write at most ${MAX_GROUNDUP_FILES} related implementation files in this slice.`;
 	}
 
 	if (event.toolName === "edit") {
 		budget.editCalls += 1;
 		if (budget.editCalls > MAX_GROUNDUP_EDIT_CALLS) {
-			return "GroundUp slice is too large: use at most one edit call, then stop and explain the slice.";
+			return `GroundUp slice is too large: use at most ${MAX_GROUNDUP_EDIT_CALLS} edit calls, then stop and explain the slice.`;
 		}
 		if (countEditBlocks(event.input) > MAX_GROUNDUP_EDIT_BLOCKS) {
 			return `GroundUp slice is too large: use at most ${MAX_GROUNDUP_EDIT_BLOCKS} edit blocks in one slice.`;
@@ -238,7 +241,7 @@ function consumeGroundUpBudget(event: { toolName: string; input: Record<string, 
 	if (event.toolName === "write") {
 		budget.writeCalls += 1;
 		if (budget.writeCalls > MAX_GROUNDUP_WRITE_CALLS) {
-			return "GroundUp slice is too large: use at most one write call, then stop and explain the slice.";
+			return `GroundUp slice is too large: use at most ${MAX_GROUNDUP_WRITE_CALLS} write calls, then stop and explain the slice.`;
 		}
 		const bytes = writeBytes(event.input);
 		if (bytes > MAX_GROUNDUP_WRITE_BYTES) {
