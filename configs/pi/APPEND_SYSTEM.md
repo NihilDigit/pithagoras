@@ -16,4 +16,4 @@ When privileged access is needed, write normal sudo commands such as `sudo pacma
 
 If sudo is denied, cancelled, or fails because authentication did not complete, treat that as a user decision or a current environment constraint. Stop trying to run that privileged command and choose the next useful step: explain what could not be done, look for a non-privileged alternative, gather more information, or ask the user how to proceed.
 
-Keep sudo authentication on the user side. Use regular sudo commands rather than password piping, password guessing, `sudo -S`, `--stdin`, `sudo -n`, `--non-interactive`, custom `SUDO_ASKPASS`, or other authentication workarounds.
+Keep sudo authentication on the user side. Use regular sudo commands and leave password entry, approval, and authentication retries to the user.

@@ -5,7 +5,7 @@ import { chmodSync, existsSync, mkdirSync, unlinkSync, writeFileSync } from "nod
 import { createServer, type Server } from "node:net";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
-import { Key, matchesKey, truncateToWidth } from "@earendil-works/pi-tui";
+import { Key, matchesKey, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 
 const STATE_KEY = "sudo-gate";
 const TOKEN_TTL_MS = 30_000;
@@ -213,53 +213,74 @@ async function askPassword(ctx: {
 		custom<T>(factory: (tui: { requestRender(): void }, theme: { fg(name: string, text: string): string; bold(text: string): string }, keybindings: unknown, done: (value: T) => void) => unknown, options?: unknown): Promise<T>;
 	};
 }): Promise<string | undefined> {
-	return ctx.ui.custom<string | undefined>((tui, theme, _keybindings, done) => {
-		let value = "";
-		let cacheWidth = 0;
-		let cache: string[] | undefined;
+	return ctx.ui.custom<string | undefined>(
+		(tui, theme, _keybindings, done) => {
+			let value = "";
+			let cacheWidth = 0;
+			let cache: string[] | undefined;
 
-		function invalidate(): void {
-			cache = undefined;
-		}
+			function invalidate(): void {
+				cache = undefined;
+			}
 
-		return {
-			render(width: number): string[] {
-				if (cache && cacheWidth === width) return cache;
-				const bullets = "•".repeat(value.length);
-				const input = bullets.length > 0 ? bullets : theme.fg("dim", "password stays in this Pi session only");
-				cache = [
-					truncateToWidth(theme.fg("accent", theme.bold("sudo-gate password")), width),
-					truncateToWidth(theme.fg("muted", "Enter sudo password for this Pi session. Esc cancels."), width),
-					truncateToWidth(`${theme.fg("accent", "> ")}${input}`, width),
-					truncateToWidth(theme.fg("dim", "enter submit • esc cancel"), width),
-				];
-				cacheWidth = width;
-				return cache;
+			function boxedLine(text: string, innerWidth: number): string {
+				const clipped = truncateToWidth(text, innerWidth);
+				return `│${clipped}${" ".repeat(Math.max(0, innerWidth - visibleWidth(clipped)))}│`;
+			}
+
+			return {
+				render(width: number): string[] {
+					if (cache && cacheWidth === width) return cache;
+					const innerWidth = Math.max(24, width - 2);
+					const bullets = "•".repeat(value.length);
+					const input = bullets.length > 0 ? bullets : theme.fg("dim", "password stays in this Pi session only");
+					cache = [
+						`┌${"─".repeat(innerWidth)}┐`,
+						boxedLine(` ${theme.fg("accent", theme.bold("sudo-gate password"))}`, innerWidth),
+						boxedLine(` ${theme.fg("muted", "Enter sudo password for this Pi session")}`, innerWidth),
+						boxedLine("", innerWidth),
+						boxedLine(` ${theme.fg("accent", "> ")}${input}`, innerWidth),
+						boxedLine("", innerWidth),
+						boxedLine(` ${theme.fg("dim", "enter submit • esc cancel")}`, innerWidth),
+						`└${"─".repeat(innerWidth)}┘`,
+					];
+					cacheWidth = width;
+					return cache;
+				},
+				handleInput(data: string): void {
+					if (matchesKey(data, Key.enter) || data === "\n") {
+						done(value.length > 0 ? value : undefined);
+						return;
+					}
+					if (matchesKey(data, Key.escape) || matchesKey(data, Key.ctrl("c"))) {
+						done(undefined);
+						return;
+					}
+					if (matchesKey(data, Key.backspace) || data === "\x7f") {
+						value = value.slice(0, -1);
+						invalidate();
+						tui.requestRender();
+						return;
+					}
+					if (data.length === 1 && data >= " " && data !== "\x7f") {
+						value += data;
+						invalidate();
+						tui.requestRender();
+					}
+				},
+				invalidate,
+			};
+		},
+		{
+			overlay: true,
+			overlayOptions: {
+				anchor: "center",
+				width: 64,
+				maxHeight: 10,
+				margin: 2,
 			},
-			handleInput(data: string): void {
-				if (matchesKey(data, Key.enter) || data === "\n") {
-					done(value.length > 0 ? value : undefined);
-					return;
-				}
-				if (matchesKey(data, Key.escape) || matchesKey(data, Key.ctrl("c"))) {
-					done(undefined);
-					return;
-				}
-				if (matchesKey(data, Key.backspace) || data === "\x7f") {
-					value = value.slice(0, -1);
-					invalidate();
-					tui.requestRender();
-					return;
-				}
-				if (data.length === 1 && data >= " " && data !== "\x7f") {
-					value += data;
-					invalidate();
-					tui.requestRender();
-				}
-			},
-			invalidate,
-		};
-	}, { overlay: true });
+		},
+	);
 }
 
 export default function sudoGate(pi: ExtensionAPI): void {
