@@ -1,6 +1,6 @@
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { AssistantMessage, TextContent } from "@earendil-works/pi-ai";
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { compact, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { isAbsolute, normalize, relative } from "node:path";
 
 const CUSTOM_TYPE = "pithagoras-stance";
@@ -151,6 +151,21 @@ After the action, explain what became more likely, less likely, contradicted, or
 
 Written Probe work belongs in ${PITHAGORAS_DIR}/probe.md or ${PITHAGORAS_DIR}/experiments/.
 Do not write docs/probe.md or implementation files during Probe. Probe artifacts are evidence-gathering building blocks unless the user explicitly moves to GroundUp.`;
+}
+
+function pithagorasCompactionInstructions(existing?: string): string {
+	const instructions = `Pithagoras source of truth lives in ${PITHAGORAS_DIR}/.
+Do not inline, replace, or re-summarize those files in the compact summary.
+
+Preserve only:
+- current Pithagoras stance;
+- active ${PITHAGORAS_DIR}/ files;
+- current next building block if it exists only in conversation;
+- unresolved decisions not yet written to ${PITHAGORAS_DIR}/.
+
+When continuing Pithagoras work, read the relevant ${PITHAGORAS_DIR}/ file on demand.`;
+
+	return existing?.trim() ? `${existing.trim()}\n\n${instructions}` : instructions;
 }
 
 function groundUpPrompt(state: PithagorasState): string {
@@ -378,6 +393,26 @@ export default function pithagoras(pi: ExtensionAPI): void {
 		const stancePrompt =
 			state.stance === "frame" ? framePrompt() : state.stance === "probe" ? probePrompt() : groundUpPrompt(state);
 		return { systemPrompt: `${event.systemPrompt}\n\n${corePrinciplePrompt()}\n\n${stancePrompt}` };
+	});
+
+	pi.on("session_before_compact", async (event, ctx) => {
+		if (!state.stance || !ctx.model) return;
+
+		const auth = await ctx.modelRegistry.getApiKeyAndHeaders(ctx.model);
+		if (!auth.ok) {
+			ctx.ui.notify(`Pithagoras compaction auth failed: ${auth.error}`, "warning");
+			return;
+		}
+
+		const compaction = await compact(
+			event.preparation,
+			ctx.model,
+			auth.apiKey,
+			auth.headers,
+			pithagorasCompactionInstructions(event.customInstructions),
+			event.signal,
+		);
+		return { compaction };
 	});
 
 	pi.on("tool_call", async (event, ctx) => {
