@@ -123,11 +123,27 @@ Documentation fallback:
 
 ## Apply
 
+Linux/macOS:
+
 ```bash
 ./scripts/apply.sh
 ```
 
+Windows PowerShell:
+
+```powershell
+.\scripts\apply.ps1
+```
+
+Windows `cmd.exe`:
+
+```bat
+.\scripts\apply.cmd
+```
+
 The script backs up existing target files before copying configs, installs the expected Pi packages, installs `agent-browser`, installs the `agent-browser` Agent Skill via `bunx skills`, and merges the package list into `~/.pi/agent/settings.json`. It copies the managed footer extension to `~/.pi/agent/extensions/pi-footer.ts`.
+
+On Windows, `scripts/apply.ps1` installs only `extensions/pithagoras/index.ts` from the Pithagoras package and writes `APPEND_SYSTEM.md` without the sudo-gate section. The Linux/macOS script keeps sudo-gate enabled.
 
 After applying, restart Pi or run `/reload` where applicable.
 
