@@ -4,7 +4,7 @@ Personal Pi setup for organizing and maintaining my own Pi environment.
 
 This repository contains two pieces:
 
-- a Pi package that provides the Pithagoras interaction stance extension and sudo-gate
+- a Pi package that provides the Pithagoras PI+TA workflow extension and sudo-gate
 - machine-independent dotfiles for my personal Pi setup, including the custom Pi footer
 
 The setup snapshots are:
@@ -46,28 +46,28 @@ pi -e .
 
 Commands provided by the package:
 
-- `/frame` — enter Framing stance
-- `/probe` — enter Probe stance
-- `/groundup` — enter GroundUp stance
-- `/pithagoras off` — clear the current stance
+- `/pithagoras` — enter PI+TA mode in the current session
+- `/pithagoras <task>` — enter PI+TA mode and send the task to the PI
+- `/pithagoras status` — show the current Pithagoras role
+- `/pithagoras off` — clear the current Pithagoras role
+- `/pith-return` — return from a TA session to its parent PI session
 - `/sudo-gate` — show sudo-gate status
 - `/sudo-gate on|off` — enable or disable sudo-gate for this session branch
 - `/sudo-gate paths` — show generated askpass, sudo wrapper, and broker socket paths
 - `/sudo-gate forget` — clear the session sudo password from memory
 
-Pithagoras works in small building blocks. Each stance uses an abstraction ladder so the user can follow the work before internal names appear:
+Pithagoras now runs as a PI+TA session workflow.
 
-- Framing: user knowledge baseline → user-visible model → mechanism vocabulary → decision point.
-- Probe: user-visible doubt → testable hypothesis → cheap evidence → model update.
-- GroundUp: user-visible change → runtime mechanism → code object → coherent slice.
+The PI stays in the main session. It treats real work as a teaching case: it frames the task around the user's understanding, reads only a small amount when needed, and dispatches focused TA sessions for explanation, exploration, probing, or building. The PI can use `spawn_ta` but cannot do implementation work itself.
 
-The extension shows the active ladder in the TUI while a stance is enabled. GroundUp must orient the user around visible behavior, runtime mechanism, code target, and non-goals before touching tools.
+Each TA runs in a separate Pi session. The TA works with the user on the task from the PI, using explanation, code reading, experiments, and implementation as needed. TA sessions keep the user's understanding first, assume the time budget is effectively unlimited, and stop to resolve confusion before advancing. If a task cannot be completed as given, the TA works with the user on a fallback and reports that back to the PI.
 
-Harness workspace:
+The extension adds two light guardrails:
 
-- Framing writes only to `.pithagoras/framing.md`
-- Probe writes only to `.pithagoras/probe.md` or `.pithagoras/experiments/`
-- GroundUp edits implementation as one coherent vertical slice at a time. A slice may touch a small related module cluster when the constraint requires wiring, tests, or UI/data pairs.
+- PI read budget: one file and 8 KB per turn. If more project reality is needed, the PI must dispatch a TA.
+- TA small-step budget: limited reads, bash calls, and writes per turn. If the TA moves too far, the tool call is blocked and the TA must explain the current state to the user before continuing.
+
+PI→TA and TA→PI switches both show an editable confirmation. The confirmed dispatch or handback is passed automatically through the session switch. No long-lived Spec document is required; the session handoff is the record.
 
 Agent-facing prompts and UI text are English. User-facing replies and written artifacts follow the user's language; code comments stay English.
 

@@ -2,7 +2,7 @@
   "name": "pithagoras",
   "version": "0.1.0",
   "private": true,
-  "description": "Personal Pi package for Pithagoras interaction stances and sudo-gate.",
+  "description": "Personal Pi package for Pithagoras PI+TA workflow and sudo-gate.",
   "keywords": [
     "pi-package"
   ],
@@ -17,6 +17,7 @@
     "@earendil-works/pi-ai": "*",
     "@earendil-works/pi-agent-core": "*",
     "@earendil-works/pi-coding-agent": "*",
-    "@earendil-works/pi-tui": "*"
+    "@earendil-works/pi-tui": "*",
+    "typebox": "*"
   }
 }
