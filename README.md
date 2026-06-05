@@ -67,7 +67,7 @@ The extension adds two light guardrails:
 - PI read budget: one file and 8 KB per turn. If more project reality is needed, the PI must dispatch a TA.
 - TA small-step budget: limited reads, bash calls, and writes per turn. If the TA moves too far, the tool call is blocked and the TA must explain the current state to the user before continuing.
 
-PI→TA and TA→PI switches both show an editable confirmation. The confirmed dispatch or handback is passed automatically through the session switch. No long-lived Spec document is required; the session handoff is the record.
+PI→TA and TA→PI switches are command-confirmed: the tool prepares `/pith-spawn` or `/pith-return` in the editor, the user presses Enter, and then Pi shows an editable confirmation. The confirmed dispatch or handback is passed automatically through the session switch. No long-lived Spec document is required; the session handoff is the record.
 
 Agent-facing prompts and UI text are English. User-facing replies and written artifacts follow the user's language; code comments stay English.
 

@@ -407,7 +407,7 @@ export default function pithagoras(pi: ExtensionAPI): void {
 			returnWhen: Type.Optional(Type.String({ description: "When the TA should return to PI" })),
 			notes: Type.Optional(Type.String({ description: "Any extra constraints or context for the TA" })),
 		}),
-		async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
+		async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
 			if (state.role !== "pi") {
 				return {
 					content: [{ type: "text", text: "spawn_ta is only available in Pithagoras PI mode. Run /pithagoras first." }],
@@ -415,12 +415,24 @@ export default function pithagoras(pi: ExtensionAPI): void {
 				};
 			}
 			const payload: DispatchPayload = params;
-			await pi.sendUserMessage(`/pith-spawn ${encodePayload(payload)}`, { deliverAs: "followUp" });
+			const command = `/pith-spawn ${encodePayload(payload)}`;
+			if (ctx.hasUI) {
+				ctx.ui.setEditorText(command);
+				ctx.ui.notify("TA dispatch command is ready in the editor. Press Enter to review and switch sessions.", "info");
+			}
 			return {
-				content: [{ type: "text", text: "Queued TA dispatch confirmation. The user will review it before the session switch." }],
-				details: { payload },
+				content: [
+					{
+						type: "text",
+						text: ctx.hasUI
+							? "Prepared the TA dispatch command in the editor. Stop now and let the user press Enter to review it."
+							: `Ask the user to run this command to review and start the TA session:\n\n${command}`,
+					},
+				],
+				details: { payload, command },
 			};
 		},
+
 	});
 
 	pi.registerTool({
@@ -432,19 +444,31 @@ export default function pithagoras(pi: ExtensionAPI): void {
 		parameters: Type.Object({
 			handback: Type.String({ description: "Short handback for the PI" }),
 		}),
-		async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
+		async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
 			if (state.role !== "ta") {
 				return {
 					content: [{ type: "text", text: "return_to_pi is only available in a Pithagoras TA session." }],
 					details: { blocked: true },
 				};
 			}
-			await pi.sendUserMessage(`/pith-return ${encodePayload({ handback: params.handback })}`, { deliverAs: "followUp" });
+			const command = `/pith-return ${encodePayload({ handback: params.handback })}`;
+			if (ctx.hasUI) {
+				ctx.ui.setEditorText(command);
+				ctx.ui.notify("PI handback command is ready in the editor. Press Enter to review and return.", "info");
+			}
 			return {
-				content: [{ type: "text", text: "Queued PI handback confirmation. The user will review it before returning." }],
-				details: { handback: params.handback },
+				content: [
+					{
+						type: "text",
+						text: ctx.hasUI
+							? "Prepared the PI handback command in the editor. Stop now and let the user press Enter to review it."
+							: `Ask the user to run this command to review and return to PI:\n\n${command}`,
+					},
+				],
+				details: { handback: params.handback, command },
 			};
 		},
+
 	});
 
 	pi.registerCommand("pithagoras", {
@@ -492,11 +516,23 @@ export default function pithagoras(pi: ExtensionAPI): void {
 				return;
 			}
 			const taPayload: DispatchPayload = { ...payload, dispatchMarkdown: editedDispatch };
+			const taState: PithagorasState = {
+				role: "ta",
+				parentSession: currentSessionFile,
+				taKind: payload.kind,
+				dispatch: editedDispatch,
+			};
 			const result = await ctx.newSession({
 				parentSession: currentSessionFile,
+				setup: async (sessionManager) => {
+					sessionManager.appendCustomEntry(CUSTOM_TYPE, taState);
+					sessionManager.appendSessionInfo(dispatchTitle(taPayload));
+				},
 				withSession: async (replacementCtx) => {
 					replacementCtx.ui.notify("Starting Pithagoras TA session", "info");
-					await replacementCtx.sendUserMessage(`/pith-ta-init ${encodePayload(taPayload)}`);
+					await replacementCtx.sendUserMessage(
+						`You are now in a Pithagoras TA session. Work with the user on the PI dispatch below.\n\n${editedDispatch}\n\nStart by orienting the user to this task and then proceed in small collaborative steps.`,
+					);
 				},
 			});
 			if (result.cancelled) ctx.ui.notify("TA session creation cancelled", "info");
